@@ -1,0 +1,369 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: journeys
+    description: Journey planning and active trip operations
+  - name: wallet
+    description: Wallet balance and ledger operations
+  - name: dashboard
+    description: Commuter dashboard summaries
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get commuter dashboard summary
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+  /journeys/options:
+    get:
+      operationId: getJourneyOptions
+      tags: [journeys]
+      summary: Find multimodal journey options
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: departAt
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Available route options
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/JourneyOption"
+  /journeys/confirm:
+    post:
+      operationId: confirmJourney
+      tags: [journeys]
+      summary: Confirm a journey and place fare holds
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JourneyConfirmationInput"
+      responses:
+        "201":
+          description: Confirmed journey
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActiveJourney"
+        "400":
+          description: Invalid journey or insufficient balance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /journeys/active:
+    get:
+      operationId: getActiveJourney
+      tags: [journeys]
+      summary: Get the commuter's active journey
+      responses:
+        "200":
+          description: Active journey, or null when there is none
+          content:
+            application/json:
+              schema:
+                type: ["object", "null"]
+                $ref: "#/components/schemas/ActiveJourney"
+  /journeys/{journeyId}/validate:
+    post:
+      operationId: validateJourneyLeg
+      tags: [journeys]
+      summary: Validate the current ticket for a journey leg
+      parameters:
+        - name: journeyId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ValidateJourneyLegInput"
+      responses:
+        "200":
+          description: Updated active journey
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActiveJourney"
+        "404":
+          description: Journey not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /wallet:
+    get:
+      operationId: getWallet
+      tags: [wallet]
+      summary: Get wallet balance
+      responses:
+        "200":
+          description: Wallet balance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Wallet"
+  /wallet/ledger:
+    get:
+      operationId: getWalletLedger
+      tags: [wallet]
+      summary: Get wallet ledger entries
+      responses:
+        "200":
+          description: Ledger entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/LedgerEntry"
+  /wallet/top-up:
+    post:
+      operationId: topUpWallet
+      tags: [wallet]
+      summary: Add sandbox funds to the wallet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WalletTopUpInput"
+      responses:
+        "201":
+          description: Updated wallet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Wallet"
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required: [error]
+    DashboardSummary:
+      type: object
+      properties:
+        greeting:
+          type: string
+        balancePaise:
+          type: integer
+        activeJourney:
+          type: ["object", "null"]
+          $ref: "#/components/schemas/ActiveJourney"
+        recentJourneys:
+          type: array
+          items:
+            $ref: "#/components/schemas/RecentJourney"
+        simTime:
+          type: string
+      required: [greeting, balancePaise, activeJourney, recentJourneys, simTime]
+    RecentJourney:
+      type: object
+      properties:
+        id:
+          type: string
+        from:
+          type: string
+        to:
+          type: string
+        completedAt:
+          type: string
+        totalFarePaise:
+          type: integer
+        modes:
+          type: array
+          items:
+            type: string
+      required: [id, from, to, completedAt, totalFarePaise, modes]
+    JourneyLeg:
+      type: object
+      properties:
+        id:
+          type: string
+        mode:
+          type: string
+          enum: [WALK, BUS, METRO, CAB]
+        provider:
+          type: string
+        from:
+          type: string
+        to:
+          type: string
+        durationMinutes:
+          type: integer
+        farePaise:
+          type: integer
+        holdPaise:
+          type: integer
+        status:
+          type: string
+          enum: [PLANNED, HELD, ACTIVE, COMPLETED, SKIPPED]
+        accent:
+          type: string
+      required: [id, mode, provider, from, to, durationMinutes, farePaise, holdPaise, status, accent]
+    JourneyOption:
+      type: object
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        durationMinutes:
+          type: integer
+        arrivalTime:
+          type: string
+        totalFarePaise:
+          type: integer
+        holdPaise:
+          type: integer
+        confidence:
+          type: integer
+        recommended:
+          type: boolean
+        legs:
+          type: array
+          items:
+            $ref: "#/components/schemas/JourneyLeg"
+      required: [id, label, durationMinutes, arrivalTime, totalFarePaise, holdPaise, confidence, recommended, legs]
+    ActiveJourney:
+      type: object
+      properties:
+        id:
+          type: string
+        from:
+          type: string
+        to:
+          type: string
+        status:
+          type: string
+          enum: [CONFIRMED, IN_PROGRESS, COMPLETED]
+        totalFarePaise:
+          type: integer
+        heldPaise:
+          type: integer
+        currentLegIndex:
+          type: integer
+        confirmedAt:
+          type: string
+        legs:
+          type: array
+          items:
+            $ref: "#/components/schemas/JourneyLeg"
+        ticket:
+          type: object
+          properties:
+            id:
+              type: string
+            code:
+              type: string
+            expiresInSeconds:
+              type: integer
+          required: [id, code, expiresInSeconds]
+      required: [id, from, to, status, totalFarePaise, heldPaise, currentLegIndex, confirmedAt, legs, ticket]
+    JourneyConfirmationInput:
+      type: object
+      properties:
+        optionId:
+          type: string
+      required: [optionId]
+    Wallet:
+      type: object
+      properties:
+        balancePaise:
+          type: integer
+        heldPaise:
+          type: integer
+        availablePaise:
+          type: integer
+        currency:
+          type: string
+      required: [balancePaise, heldPaise, availablePaise, currency]
+    LedgerEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [CREDIT, HOLD, RELEASE, DEBIT]
+        label:
+          type: string
+        amountPaise:
+          type: integer
+        createdAt:
+          type: string
+        status:
+          type: string
+      required: [id, type, label, amountPaise, createdAt, status]
+    WalletTopUpInput:
+      type: object
+      properties:
+        amountPaise:
+          type: integer
+          minimum: 100
+      required: [amountPaise]
+    ValidateJourneyLegInput:
+      type: object
+      properties:
+        legId:
+          type: string
+      required: [legId]
+

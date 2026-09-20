@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Namma Journey"
+description = "A Bengaluru multimodal mobility app that plans bus, metro, cab, and walking journeys, previews the total fare, and keeps tickets and wallet activity in one place."
+version = "1.0.0"
+id = "artifacts/namma-journey"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 18337
+
+[services.development]
+run = "pnpm --filter @workspace/namma-journey run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/namma-journey", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/namma-journey/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18337"
+BASE_PATH = "/"
