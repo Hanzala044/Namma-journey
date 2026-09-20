@@ -13,3 +13,7 @@ export function formatTime(isoString: string) {
   const date = new Date(isoString)
   return date.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true })
 }
+
+export function getErrorMessage(error: unknown, fallback: string) {
+  return error instanceof Error && error.message ? error.message : fallback
+}

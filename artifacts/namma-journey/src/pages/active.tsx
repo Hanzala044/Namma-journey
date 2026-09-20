@@ -5,24 +5,33 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { LegIcon } from "@/components/leg-icon"
 import { Navigation, QrCode, ScanLine, Clock, CheckCircle2 } from "lucide-react"
-import { formatMoney, cn } from "@/lib/utils"
+import { cn, formatMoney, getErrorMessage } from "@/lib/utils"
 import { useQueryClient } from "@tanstack/react-query"
 import { getGetWalletQueryKey } from "@workspace/api-client-react"
+import { useToast } from "@/hooks/use-toast"
 
 export default function ActiveJourney() {
   const [, setLocation] = useLocation()
   
-  const { data: activeJourney, isLoading } = useGetActiveJourney({
+  const { data: activeJourney, error, isError, isLoading } = useGetActiveJourney({
     query: { queryKey: getGetActiveJourneyQueryKey(), refetchInterval: 5000 }
   })
 
   const queryClient = useQueryClient()
+  const { toast } = useToast()
   const validate = useValidateJourneyLeg({
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetActiveJourneyQueryKey() })
         queryClient.invalidateQueries({ queryKey: getGetWalletQueryKey() })
-      }
+      },
+      onError: (error) => {
+        toast({
+          title: "Validation failed",
+          description: getErrorMessage(error, "The ticket could not be validated. Try again."),
+          variant: "destructive",
+        })
+      },
     }
   })
 
@@ -37,6 +46,23 @@ export default function ActiveJourney() {
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-80 w-full rounded-[2rem]" />
         <Skeleton className="h-64 w-full rounded-[1.5rem]" />
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full min-h-[60vh] text-center animate-in px-4">
+        <div className="h-24 w-24 rounded-full bg-destructive/10 flex items-center justify-center mb-6">
+          <Navigation className="h-10 w-10 text-destructive opacity-70" />
+        </div>
+        <h2 className="text-2xl font-bold tracking-tight mb-2">Journey unavailable</h2>
+        <p className="text-muted-foreground mb-8 max-w-sm">
+          {getErrorMessage(error, "We couldn’t load your active journey.")}
+        </p>
+        <Button onClick={() => setLocation("/")} size="lg" className="rounded-full px-8">
+          Plan a Journey
+        </Button>
       </div>
     )
   }

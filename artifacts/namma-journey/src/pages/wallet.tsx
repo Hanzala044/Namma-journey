@@ -3,8 +3,9 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { WalletCards, Plus, ArrowDownToLine, ShieldAlert, ArrowUpFromLine, RefreshCw } from "lucide-react"
-import { formatMoney, cn } from "@/lib/utils"
+import { cn, formatMoney, getErrorMessage } from "@/lib/utils"
 import { useQueryClient } from "@tanstack/react-query"
+import { useToast } from "@/hooks/use-toast"
 
 export default function Wallet() {
   const { data: wallet, isLoading: isWalletLoading } = useGetWallet({
@@ -16,12 +17,20 @@ export default function Wallet() {
   })
 
   const queryClient = useQueryClient()
+  const { toast } = useToast()
   const topUp = useTopUpWallet({
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetWalletQueryKey() })
         queryClient.invalidateQueries({ queryKey: getGetWalletLedgerQueryKey() })
-      }
+      },
+      onError: (error) => {
+        toast({
+          title: "Top-up failed",
+          description: getErrorMessage(error, "We couldn’t add funds to your wallet."),
+          variant: "destructive",
+        })
+      },
     }
   })
 

@@ -1,16 +1,17 @@
 import { Link, useLocation } from "wouter"
-import { Home, Compass, WalletCards, History, User } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { Compass, History, Home, User, WalletCards } from "lucide-react"
 import { useGetActiveJourney } from "@workspace/api-client-react"
 import { getGetActiveJourneyQueryKey } from "@workspace/api-client-react"
+import { cn } from "@/lib/utils"
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const [location] = useLocation()
-  
+
   const { data: activeJourney } = useGetActiveJourney({
     query: {
-      queryKey: getGetActiveJourneyQueryKey()
-    }
+      queryKey: getGetActiveJourneyQueryKey(),
+      refetchInterval: 10_000,
+    },
   })
 
   const hasActive = activeJourney && activeJourney.status !== "COMPLETED"
@@ -27,6 +28,13 @@ export function Shell({ children }: { children: React.ReactNode }) {
     { icon: History, label: "History", path: "/history" },
   ]
 
+  const isNavItemActive = (path: string) => {
+    if (path === "/") {
+      return location === "/" || location.startsWith("/options") || location.startsWith("/journey/")
+    }
+    return location === path || location.startsWith(`${path}/`)
+  }
+
   return (
     <div className="flex h-[100dvh] w-full flex-col bg-muted/30">
       <main className="flex-1 overflow-y-auto overflow-x-hidden pb-[88px] md:pb-0 md:pl-[240px]">
@@ -38,7 +46,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
       {/* Mobile Nav */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 flex h-[88px] items-center justify-around border-t bg-background/80 px-4 pb-safe pt-2 backdrop-blur-xl md:hidden">
         {navItems.map((item) => {
-          const isActive = location === item.path || (location.startsWith(item.path) && item.path !== "/")
+          const isActive = isNavItemActive(item.path)
           return (
             <Link key={item.path} href={item.path} className="group relative flex flex-col items-center justify-center w-16 h-14">
               <div className={cn(
@@ -74,7 +82,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         
         <div className="flex-1 px-4 py-8 space-y-2">
           {navItems.map((item) => {
-            const isActive = location === item.path || (location.startsWith(item.path) && item.path !== "/")
+            const isActive = isNavItemActive(item.path)
             return (
               <Link key={item.path} href={item.path} className={cn(
                 "flex items-center gap-4 rounded-xl px-4 py-3 text-sm font-semibold transition-colors relative",

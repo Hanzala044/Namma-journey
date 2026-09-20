@@ -1,4 +1,4 @@
-import React from "react"
+import { Fragment, useEffect } from "react"
 import { useLocation } from "wouter"
 import { useGetJourneyOptions, getGetJourneyOptionsQueryKey } from "@workspace/api-client-react"
 import { ArrowLeft, Clock, Zap, Leaf } from "lucide-react"
@@ -6,23 +6,26 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { LegIcon } from "@/components/leg-icon"
-import { formatMoney, formatTime, cn } from "@/lib/utils"
+import { cn, formatMoney, formatTime, getErrorMessage } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
 
 export default function Options() {
-  const [location, setLocation] = useLocation()
+  const [, setLocation] = useLocation()
   
   const searchParams = new URLSearchParams(window.location.search)
   const from = searchParams.get("from") || ""
   const to = searchParams.get("to") || ""
 
-  const { data: options, isLoading } = useGetJourneyOptions(
+  const { data: options, error, isError, isLoading } = useGetJourneyOptions(
     { from, to },
     { query: { enabled: !!from && !!to, queryKey: getGetJourneyOptionsQueryKey({ from, to }) } }
   )
 
+  useEffect(() => {
+    if (!from || !to) setLocation("/")
+  }, [from, setLocation, to])
+
   if (!from || !to) {
-    setLocation("/")
     return null
   }
 
@@ -47,13 +50,25 @@ export default function Options() {
           </>
         )}
 
-        {!isLoading && options?.length === 0 && (
+        {isError && (
+          <Card className="p-6 text-center">
+            <h2 className="font-bold">We couldn’t find routes</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {getErrorMessage(error, "Try searching again with different locations.")}
+            </p>
+            <Button variant="outline" className="mt-5" onClick={() => setLocation("/")}>
+              Plan again
+            </Button>
+          </Card>
+        )}
+
+        {!isLoading && !isError && options?.length === 0 && (
           <div className="text-center py-12 text-muted-foreground">
             No routes found between these locations.
           </div>
         )}
 
-        {!isLoading && options?.map((opt, index) => (
+        {!isLoading && !isError && options?.map((opt) => (
           <Card 
             key={opt.id} 
             className={cn(
@@ -79,7 +94,7 @@ export default function Options() {
 
             <div className="flex gap-2 items-center mb-4 overflow-x-auto hide-scrollbar">
               {opt.legs.map((leg, i) => (
-                <React.Fragment key={leg.id}>
+                <Fragment key={leg.id}>
                   <div className="flex items-center gap-1.5 shrink-0 bg-background rounded-full pl-1 pr-3 py-1 border shadow-sm">
                     <LegIcon mode={leg.mode} className="h-6 w-6" />
                     <span className="text-xs font-bold">{leg.provider}</span>
@@ -87,7 +102,7 @@ export default function Options() {
                   {i < opt.legs.length - 1 && (
                     <div className="h-0.5 w-3 bg-border shrink-0" />
                   )}
-                </React.Fragment>
+                </Fragment>
               ))}
             </div>
 

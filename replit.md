@@ -23,11 +23,21 @@ One plan, one balance, and one pass for multimodal journeys across Bengaluru.
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/namma-journey/src/App.tsx` — frontend route order and shared providers
+- `artifacts/namma-journey/src/components/shell.tsx` — responsive navigation and active-journey indicator
+- `artifacts/namma-journey/src/pages/` — commuter flow in order: plan, options, journey review, active journey, wallet, history, account
+- `artifacts/api-server/src/routes/` — API route groups in health, dashboard, journeys, and wallet order
+- `artifacts/api-server/src/lib/transit-state.ts` — simulator state transitions and wallet ledger rules
+- `lib/api-spec/openapi.yaml` — API contract source of truth
+- `artifacts/namma-journey/src/index.css` — shared theme tokens and global styles
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- The current milestone uses an in-memory transit simulator; persistence and live provider feeds remain deferred.
+- All fares and wallet values are stored as integer paise to avoid floating-point money errors.
+- Route option IDs are scoped to the origin and destination so confirming a route cannot use stale data from another search.
+- Walking legs are completed automatically because they do not require a validator scan; the active ticket always points to the next payable leg.
+- A commuter cannot overwrite an in-progress journey; each validated leg creates its debit and releases its unused fare hold in the append-only ledger.
 
 ## Product
 
@@ -42,7 +52,9 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Restart the managed API workflow after changing simulator or route code.
+- Run API codegen after changing `lib/api-spec/openapi.yaml` before using new generated contracts.
+- Vite configs use managed `PORT` and `BASE_PATH` values when present, with local build-safe defaults for `pnpm run build`.
 
 ## Pointers
 

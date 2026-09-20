@@ -1,16 +1,18 @@
+import { useEffect } from "react"
 import { useLocation, useParams } from "wouter"
 import { useGetJourneyOptions, getGetJourneyOptionsQueryKey, useConfirmJourney } from "@workspace/api-client-react"
 import { ArrowLeft, Clock, ShieldCheck, CheckCircle2, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { LegIcon } from "@/components/leg-icon"
-import { formatMoney, formatTime, cn } from "@/lib/utils"
+import { cn, formatMoney, formatTime, getErrorMessage } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useQueryClient } from "@tanstack/react-query"
 import { getGetActiveJourneyQueryKey, getGetWalletQueryKey } from "@workspace/api-client-react"
+import { useToast } from "@/hooks/use-toast"
 
 export default function JourneyDetail() {
-  const [location, setLocation] = useLocation()
+  const [, setLocation] = useLocation()
   const params = useParams()
   const id = params.id
 
@@ -18,12 +20,13 @@ export default function JourneyDetail() {
   const from = searchParams.get("from") || ""
   const to = searchParams.get("to") || ""
 
-  const { data: options, isLoading } = useGetJourneyOptions(
+  const { data: options, error, isError, isLoading } = useGetJourneyOptions(
     { from, to },
     { query: { enabled: !!from && !!to, queryKey: getGetJourneyOptionsQueryKey({ from, to }) } }
   )
 
   const option = options?.find(o => o.id === id)
+  const { toast } = useToast()
 
   const queryClient = useQueryClient()
   const confirm = useConfirmJourney({
@@ -32,12 +35,22 @@ export default function JourneyDetail() {
         queryClient.invalidateQueries({ queryKey: getGetActiveJourneyQueryKey() })
         queryClient.invalidateQueries({ queryKey: getGetWalletQueryKey() })
         setLocation("/active")
-      }
+      },
+      onError: (error) => {
+        toast({
+          title: "Couldn’t confirm journey",
+          description: getErrorMessage(error, "Check your wallet and try again."),
+          variant: "destructive",
+        })
+      },
     }
   })
 
+  useEffect(() => {
+    if (!from || !to || (!isLoading && !option)) setLocation("/")
+  }, [from, isLoading, option, setLocation, to])
+
   if (!from || !to || (!isLoading && !option)) {
-    setLocation("/")
     return null
   }
 
@@ -62,6 +75,16 @@ export default function JourneyDetail() {
           <Skeleton className="h-32 w-full rounded-[1.5rem]" />
           <Skeleton className="h-64 w-full rounded-[1.5rem]" />
         </div>
+      ) : isError ? (
+        <Card className="p-6 text-center">
+          <h2 className="font-bold">Journey details unavailable</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {getErrorMessage(error, "Return to route planning and try again.")}
+          </p>
+          <Button variant="outline" className="mt-5" onClick={() => setLocation("/")}>
+            Plan again
+          </Button>
+        </Card>
       ) : option ? (
         <>
           <Card className="p-6 bg-foreground text-background border-none overflow-hidden relative shadow-lg shadow-foreground/10">

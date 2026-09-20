@@ -130,19 +130,23 @@ function option(
 export function planJourneys(from: string, to: string): JourneyOption[] {
   const origin = from.trim() || "Electronic City";
   const destination = to.trim() || "Whitefield";
+  const routeToken = createHash("sha1")
+    .update(`${origin.toLowerCase()}::${destination.toLowerCase()}`)
+    .digest("hex")
+    .slice(0, 8);
   const options = [
-    option("balanced", "Best balance", true, 94, [
+    option(`balanced-${routeToken}`, "Best balance", true, 94, [
       leg("b1", "WALK", "Namma Journey", origin, "Konappana Agrahara", 8, 0, "#667085"),
       leg("b2", "BUS", "BMTC-Sim", "Konappana Agrahara", "Silk Board", 26, 2500, "#1565C0"),
       leg("b3", "METRO", "Metro-Sim", "Silk Board", "Kadugodi Tree Park", 39, 5500, "#7B2CBF"),
       leg("b4", "CAB", "RideX", "Kadugodi Tree Park", destination, 12, 8900, "#E85D04"),
     ]),
-    option("budget", "Lowest fare", false, 88, [
+    option(`budget-${routeToken}`, "Lowest fare", false, 88, [
       leg("l1", "WALK", "Namma Journey", origin, "Electronic City", 11, 0, "#667085"),
       leg("l2", "BUS", "BMTC-Sim", "Electronic City", "Tin Factory", 58, 4200, "#1565C0"),
       leg("l3", "BUS", "BMTC-Sim", "Tin Factory", destination, 28, 2500, "#1565C0"),
     ]),
-    option("fast", "Fastest", false, 91, [
+    option(`fast-${routeToken}`, "Fastest", false, 91, [
       leg("f1", "CAB", "RideX", origin, "Bommanahalli", 15, 9900, "#E85D04"),
       leg("f2", "METRO", "Metro-Sim", "Bommanahalli", "Kadugodi Tree Park", 42, 6000, "#7B2CBF"),
       leg("f3", "CAB", "RideX", "Kadugodi Tree Park", destination, 9, 7400, "#E85D04"),
@@ -209,8 +213,28 @@ function refreshTicket(journey: ActiveJourney): ActiveJourney {
   return journey;
 }
 
+function advancePastWalkLegs(journey: ActiveJourney): void {
+  while (journey.currentLegIndex < journey.legs.length) {
+    const current = journey.legs[journey.currentLegIndex];
+    if (!current || current.mode !== "WALK") return;
+
+    current.status = "COMPLETED";
+    const next = journey.legs[journey.currentLegIndex + 1];
+    if (!next) {
+      journey.status = "COMPLETED";
+      journey.heldPaise = 0;
+      return;
+    }
+
+    journey.currentLegIndex += 1;
+    next.status = "ACTIVE";
+  }
+}
+
 export function confirmJourney(optionId: string): ActiveJourney | null {
-  const selected = optionCache.get(optionId) ?? planJourneys("Electronic City", "Whitefield").find((item) => item.id === optionId);
+  if (activeJourney && activeJourney.status !== "COMPLETED") return null;
+
+  const selected = optionCache.get(optionId);
   if (!selected || selected.holdPaise > getWallet().availablePaise) return null;
   const id = `journey-${simulationNow().getTime()}`;
   const legs = selected.legs.map((item, index) => ({
@@ -241,11 +265,13 @@ export function confirmJourney(optionId: string): ActiveJourney | null {
     createdAt: simulationNow().toISOString(),
     status: "ACTIVE",
   });
+  advancePastWalkLegs(activeJourney);
   return refreshTicket(activeJourney);
 }
 
 export function getActiveJourney(): ActiveJourney | null {
-  return activeJourney ? refreshTicket(activeJourney) : null;
+  if (!activeJourney || activeJourney.status === "COMPLETED") return null;
+  return refreshTicket(activeJourney);
 }
 
 export function validateLeg(journeyId: string, legId: string): ActiveJourney | null {
@@ -265,6 +291,17 @@ export function validateLeg(journeyId: string, legId: string): ActiveJourney | n
       createdAt: simulationNow().toISOString(),
       status: "SETTLED",
     });
+    const releasedPaise = current.holdPaise - current.farePaise;
+    if (releasedPaise > 0) {
+      ledger.push({
+        id: `led-${ledger.length + 1}`,
+        type: "RELEASE",
+        label: `Unused hold · ${current.provider}`,
+        amountPaise: releasedPaise,
+        createdAt: simulationNow().toISOString(),
+        status: "SETTLED",
+      });
+    }
     activeJourney.heldPaise = Math.max(0, activeJourney.heldPaise - current.holdPaise);
   }
 
@@ -272,6 +309,7 @@ export function validateLeg(journeyId: string, legId: string): ActiveJourney | n
   if (next) {
     next.status = "ACTIVE";
     activeJourney.currentLegIndex = index + 1;
+    advancePastWalkLegs(activeJourney);
   } else {
     activeJourney.status = "COMPLETED";
     activeJourney.heldPaise = 0;

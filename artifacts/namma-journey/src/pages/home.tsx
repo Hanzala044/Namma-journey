@@ -1,13 +1,10 @@
-import { useState } from "react"
+import { type FormEvent, useState } from "react"
 import { useLocation } from "wouter"
-import { 
-  useGetDashboardSummary, 
-  getGetDashboardSummaryQueryKey
-} from "@workspace/api-client-react"
+import { getGetDashboardSummaryQueryKey, useGetDashboardSummary } from "@workspace/api-client-react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { MapPin, Navigation, Clock, ArrowRight, WalletCards, BellRing } from "lucide-react"
+import { ArrowRight, Clock, MapPin, Navigation, WalletCards } from "lucide-react"
 import { formatMoney } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
 import { LegIcon } from "@/components/leg-icon"
@@ -17,14 +14,16 @@ export default function Home() {
   const [from, setFrom] = useState("")
   const [to, setTo] = useState("")
 
-  const { data: summary, isLoading } = useGetDashboardSummary({
-    query: { queryKey: getGetDashboardSummaryQueryKey() }
+  const { data: summary, error, isError, isLoading } = useGetDashboardSummary({
+    query: { queryKey: getGetDashboardSummaryQueryKey() },
   })
 
-  const handleSearch = (e?: React.FormEvent | React.MouseEvent) => {
-    if (e) e.preventDefault()
-    if (!from || !to) return
-    const params = new URLSearchParams({ from, to })
+  const handleSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const origin = from.trim()
+    const destination = to.trim()
+    if (!origin || !destination) return
+    const params = new URLSearchParams({ from: origin, to: destination })
     setLocation(`/options?${params.toString()}`)
   }
 
@@ -37,13 +36,16 @@ export default function Home() {
             {isLoading ? <Skeleton className="h-8 w-48 mb-2" /> : summary?.greeting || "Namaskara"}
           </h1>
           <div className="text-muted-foreground font-medium flex items-center gap-2">
-            {isLoading ? <Skeleton className="h-4 w-32" /> : summary?.simTime}
+            {isLoading ? (
+              <Skeleton className="h-4 w-32" />
+            ) : isError ? (
+              <span className="text-destructive">
+                {error instanceof Error ? error.message : "Dashboard is temporarily unavailable"}
+              </span>
+            ) : (
+              summary?.simTime
+            )}
           </div>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="icon" className="rounded-full h-12 w-12 border-2">
-            <BellRing className="h-5 w-5 text-muted-foreground" />
-          </Button>
         </div>
       </header>
 
@@ -114,11 +116,11 @@ export default function Home() {
                 required
               />
             </div>
+            <Button type="submit" className="mt-2 h-14 text-lg rounded-2xl" disabled={!from || !to}>
+              Find Routes
+            </Button>
           </form>
         </Card>
-        <Button onClick={handleSearch} className="w-full h-14 text-lg rounded-2xl" disabled={!from || !to}>
-          Find Routes
-        </Button>
       </section>
 
       {/* Recent Journeys */}
